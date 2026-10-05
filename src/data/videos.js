@@ -11,12 +11,12 @@ export const reelVideo = {
   src: 'https://res.cloudinary.com/zrwhcw4t/video/upload/v1791195220/sameer_somal_reel_1_jgkzno.mp4',
   // Auto-generated 1st frame poster from Cloudinary
   poster: 'https://res.cloudinary.com/zrwhcw4t/video/upload/so_0/v1791195220/sameer_somal_reel_1_jgkzno.jpg',
-  // duration: '00:56',
+  duration: '00:25',
 };
 
 export const documentaryVideo = {
   // Cloudinary video URL
   src: 'https://res.cloudinary.com/zrwhcw4t/video/upload/v1791201046/abraham_lincon_1_vqg22l.mp4',
   poster: 'https://res.cloudinary.com/zrwhcw4t/video/upload/so_0/v1791201046/abraham_lincon_1_vqg22l.jpg',
-  // duration: '18:42',
+  duration: '1:14',
 };

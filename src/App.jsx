@@ -26,7 +26,7 @@ function App() {
         <Clarivo />
         <Legacy />
       </main>
-      {/* <Footer /> */}
+      <Footer />
     </MotionConfig>
   );
 }
