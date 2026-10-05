@@ -7,6 +7,7 @@ import { Documentary } from './components/Documentary/Documentary';
 import { NumbersThatMatter } from './components/NumbersThatMatter/NumbersThatMatter';
 import { ShortReel } from './components/ShortReel/ShortReel';
 import { Clarivo } from './components/Clarivo/Clarivo';
+import { RelationshipCarousel } from './components/RelationshipCarousel/RelationshipCarousel';
 import { Legacy } from './components/Legacy/Legacy';
 import { Footer } from './components/Footer/Footer';
 
@@ -18,6 +19,7 @@ function App() {
       <main>
         <Hero />
         <CompaniesImpact />
+        <RelationshipCarousel />
         <ShortReel />
         <NumbersThatMatter />
         <Documentary />
