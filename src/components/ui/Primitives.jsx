@@ -29,11 +29,15 @@ export function ImagePlaceholder({ label, aspectRatio = '3/4', style = {}, dark 
   );
 }
 
-// Animated fade-up wrapper
+// Reduced travel distance on small screens (evaluated once, not on scroll)
+const REVEAL_DISTANCE =
+  typeof window !== 'undefined' && window.innerWidth < 768 ? 20 : 40;
+
+// Animated fade-up wrapper — viewport-triggered, animates once only
 export function FadeUp({ children, delay = 0, style = {} }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 32 }}
+      initial={{ opacity: 0, y: REVEAL_DISTANCE }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-60px' }}
       transition={{ duration: 0.7, delay, ease: [0.4, 0, 0.2, 1] }}

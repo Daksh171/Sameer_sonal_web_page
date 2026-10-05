@@ -1,36 +1,50 @@
 import { motion } from 'framer-motion';
+import { useState, useEffect, useRef } from 'react';
 import { timeline, metrics } from '../../data/media';
 import { SectionHeader } from '../ui/SectionHeader';
 import { FadeUp } from '../ui/Primitives';
 
 /* ─── Single timeline card ─── */
-function TimelineItem({ item, index }) {
+function TimelineItem({ item, index, revealed }) {
+  const delay = 0.25 + Math.min(index, 6) * 0.12; // sequential, capped so late items don't lag
   return (
+    /* Outer: one-time reveal (opacity + scale only) */
+    <div
+      className="tl-item"
+      style={{
+        flexShrink: 0,
+        position: 'relative',
+        zIndex: 2,
+        opacity: revealed ? 1 : 0,
+        transform: revealed ? 'scale(1)' : 'scale(0.9)',
+        transition: `opacity 0.7s cubic-bezier(0.4,0,0.2,1) ${delay}s, transform 0.7s cubic-bezier(0.4,0,0.2,1) ${delay}s`,
+      }}
+    >
     <motion.div
       whileHover={{ scale: 1.04 }}
       transition={{ duration: 0.35 }}
       style={{
         width: '280px',
-        flexShrink: 0,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         textAlign: 'center',
         padding: '0 12px',
-        position: 'relative',
-        zIndex: 2,
         cursor: 'default',
       }}
     >
+      {/* Circle wrapper — scales when active; glow layer fades in (opacity only) */}
+      <div className="tl-circle" style={{ position: 'relative', marginBottom: '22px' }}>
+        <div className="tl-glow" aria-hidden="true" />
       {/* Large circular photo */}
       <div style={{
+        position: 'relative',
         width: '230px',
         height: '230px',
         borderRadius: '50%',
         border: '4px solid rgba(200,155,82,0.65)',
         background: '#1a1208',
         overflow: 'hidden',
-        marginBottom: '22px',
         flexShrink: 0,
         boxShadow: `
           0 0 0 8px rgba(200,155,82,0.08),
@@ -61,6 +75,7 @@ function TimelineItem({ item, index }) {
             <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'var(--gold)' }} />
           </div>
         )}
+      </div>
       </div>
 
       {/* Year */}
@@ -104,6 +119,7 @@ function TimelineItem({ item, index }) {
         {item.description}
       </p>
     </motion.div>
+    </div>
   );
 }
 
@@ -156,9 +172,84 @@ function MetricItem({ metric, index }) {
 
 /* ─── Main Section ─── */
 export function NumbersThatMatter() {
+  const sectionRef = useRef(null);
+  const trackRef = useRef(null);
+  const [revealed, setRevealed] = useState(false);
+
+  /* Trigger once when section enters viewport */
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setRevealed(true);
+          observer.unobserve(section);
+        }
+      },
+      { threshold: 0.12, rootMargin: '-40px' }
+    );
+
+    observer.observe(section);
+    return () => observer.disconnect();
+  }, []);
+
+  /*
+   * Active milestone = the card closest to viewport centre.
+   * - rAF loop runs ONLY while the section is on screen
+   * - layout reads throttled to ~150ms
+   * - toggles a CSS class directly → zero React re-renders
+   */
+  useEffect(() => {
+    const section = sectionRef.current;
+    const track = trackRef.current;
+    if (!section || !track) return;
+
+    let rafId = null;
+    let last = 0;
+    let activeEl = null;
+
+    const tick = (now) => {
+      if (now - last > 150) {
+        last = now;
+        const centre = window.innerWidth / 2;
+        let best = null;
+        let bestDist = Infinity;
+        for (const el of track.children) {
+          const r = el.getBoundingClientRect();
+          const d = Math.abs(r.left + r.width / 2 - centre);
+          if (d < bestDist) { bestDist = d; best = el; }
+        }
+        if (best !== activeEl) {
+          activeEl?.classList.remove('is-active');
+          best?.classList.add('is-active');
+          activeEl = best;
+        }
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+
+    const visObserver = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && rafId === null) {
+        rafId = requestAnimationFrame(tick);
+      } else if (!entry.isIntersecting && rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    });
+    visObserver.observe(section);
+
+    return () => {
+      visObserver.disconnect();
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, []);
+
   return (
     <section
       id="journey"
+      ref={sectionRef}
       style={{
         background: 'var(--cream)',
         padding: 'var(--section-py) 0',
@@ -178,7 +269,7 @@ export function NumbersThatMatter() {
         pointerEvents: 'none',
       }} />
 
-      {/* Section header — padded */}
+      {/* Section header */}
       <div style={{ padding: '0 var(--section-px)' }}>
         <SectionHeader
           number="03"
@@ -194,11 +285,10 @@ export function NumbersThatMatter() {
       <div style={{
         position: 'relative',
         marginBottom: '80px',
-        /* Fade edges left/right */
         WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 7%, black 93%, transparent 100%)',
         maskImage: 'linear-gradient(to right, transparent 0%, black 7%, black 93%, transparent 100%)',
       }}>
-        {/* Horizontal connector line — vertically centred on 230px circles */}
+        {/* ── Connector line — draws left→right on viewport entry (GPU scaleX only) ── */}
         <div style={{
           position: 'absolute',
           top: 'calc(20px + 115px)',
@@ -208,10 +298,15 @@ export function NumbersThatMatter() {
           background: 'rgba(200,155,82,0.28)',
           zIndex: 0,
           pointerEvents: 'none',
+          transformOrigin: 'left center',
+          transform: revealed ? 'scaleX(1)' : 'scaleX(0)',
+          transition: revealed ? 'transform 1.2s cubic-bezier(0.4, 0, 0.2, 1) 0.1s' : 'none',
+          willChange: 'transform',
         }} />
 
-        {/* Scrolling track — two identical sets for seamless infinite loop */}
+        {/* ── Scrolling track — fades in, then marquee starts after 1s delay ── */}
         <div
+          ref={trackRef}
           className="marquee-track"
           style={{
             display: 'flex',
@@ -219,16 +314,17 @@ export function NumbersThatMatter() {
             paddingTop: '20px',
             paddingBottom: '32px',
             width: 'max-content',
-            animation: 'marqueeScroll 36s linear infinite',
+            /* Marquee starts once the staggered reveal has landed */
+            animation: revealed ? 'marqueeScroll 36s linear 1.4s infinite' : 'none',
           }}
         >
           {/* Set A */}
           {timeline.map((item, i) => (
-            <TimelineItem key={`a-${item.id}`} item={item} index={i} />
+            <TimelineItem key={`a-${item.id}`} item={item} index={i} revealed={revealed} />
           ))}
-          {/* Set B — exact duplicate so the loop joins invisibly */}
+          {/* Set B — identical duplicate for seamless loop */}
           {timeline.map((item, i) => (
-            <TimelineItem key={`b-${item.id}`} item={item} index={i} />
+            <TimelineItem key={`b-${item.id}`} item={item} index={timeline.length + i} revealed={revealed} />
           ))}
         </div>
       </div>
@@ -322,17 +418,40 @@ export function NumbersThatMatter() {
           100% { transform: translateX(-50%); }
         }
 
-        /* Pause on hover so the user can read a card */
+        /* Pause on hover so user can read cards */
         .marquee-track:hover {
           animation-play-state: paused;
         }
 
-        /* Respect reduced-motion: fallback to manual scroll */
+        /* Active milestone — subtle scale + soft gold glow (transform/opacity only) */
+        .tl-circle {
+          transform: scale(1);
+          transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .tl-glow {
+          position: absolute;
+          inset: -14px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(200,155,82,0.32) 0%, rgba(200,155,82,0.10) 55%, transparent 72%);
+          opacity: 0;
+          transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+          pointer-events: none;
+        }
+        .tl-item.is-active .tl-circle { transform: scale(1.06); }
+        .tl-item.is-active .tl-glow   { opacity: 1; }
+
+        /* Mobile: lighter emphasis */
+        @media (max-width: 768px) {
+          .tl-item.is-active .tl-circle { transform: scale(1.03); }
+        }
+
+        /* Reduced-motion: disable marquee, allow manual scroll */
         @media (prefers-reduced-motion: reduce) {
           .marquee-track {
             animation: none !important;
             overflow-x: auto;
           }
+          .tl-item { transition: none !important; }
         }
       `}</style>
     </section>

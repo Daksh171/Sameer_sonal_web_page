@@ -1,4 +1,5 @@
 import './index.css';
+import { MotionConfig } from 'framer-motion';
 import { Navbar } from './components/Navbar/Navbar';
 import { Hero } from './components/Hero/Hero';
 import { CompaniesImpact } from './components/CompaniesImpact/CompaniesImpact';
@@ -11,7 +12,8 @@ import { Footer } from './components/Footer/Footer';
 
 function App() {
   return (
-    <>
+    // reducedMotion="user" → Framer Motion honours the OS reduced-motion setting site-wide
+    <MotionConfig reducedMotion="user">
       <Navbar />
       <main>
         <Hero />
@@ -22,8 +24,8 @@ function App() {
         <Clarivo />
         <Legacy />
       </main>
-      <Footer />
-    </>
+      {/* <Footer /> */}
+    </MotionConfig>
   );
 }
 

@@ -1,9 +1,57 @@
+import { useRef, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { SectionHeader } from '../ui/SectionHeader';
 import { CTAButton } from '../ui/CTAButton';
 import { FadeUp } from '../ui/Primitives';
+import { reelVideo } from '../../data/videos';
 
 export function ShortReel() {
+  const videoRef = useRef(null);
+  const frameRef = useRef(null);
+  const [playing, setPlaying] = useState(false);
+  const [started, setStarted] = useState(false);
+  const hasVideo = Boolean(reelVideo.src);
+
+  // Play inside the fixed frame (never fullscreen / popup)
+  const play = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    setStarted(true);
+    v.play().catch(() => {});
+  };
+
+  const toggle = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) play();
+    else v.pause();
+  };
+
+  // "Watch Reel" CTA — scroll the frame into view and start playback in place
+  const handleCta = (e) => {
+    e.preventDefault();
+    frameRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (hasVideo) play();
+  };
+
+  // Auto-pause when the frame scrolls out of view (saves bandwidth/CPU)
+  useEffect(() => {
+    const el = frameRef.current;
+    if (!el || !hasVideo) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting && videoRef.current && !videoRef.current.paused) {
+          videoRef.current.pause();
+        }
+      },
+      { threshold: 0.25 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasVideo]);
+
+  const showOverlay = !playing;
+
   return (
     <section
       id="reel"
@@ -54,7 +102,7 @@ export function ShortReel() {
             </p>
           </FadeUp>
           <FadeUp delay={0.3}>
-            <CTAButton href="#" variant="gold">
+            <CTAButton href="#reel" variant="gold" onClick={handleCta}>
               Watch Reel →
             </CTAButton>
           </FadeUp>
@@ -63,7 +111,9 @@ export function ShortReel() {
         {/* ── Right — single 16:9 horizontal reel frame ── */}
         <FadeUp delay={0.15}>
           <motion.div
-            whileHover={{ scale: 1.015 }}
+            ref={frameRef}
+            onClick={hasVideo && !playing ? play : undefined}
+            whileHover={playing ? undefined : { scale: 1.015 }}
             transition={{ duration: 0.4 }}
             style={{
               position: 'relative',
@@ -73,148 +123,189 @@ export function ShortReel() {
               overflow: 'hidden',
               border: '1px solid rgba(200,155,82,0.2)',
               background: '#0d0a06',
-              cursor: 'pointer',
+              cursor: playing ? 'default' : 'pointer',
               boxShadow: '0 16px 64px rgba(0,0,0,0.5), 0 0 0 1px rgba(200,155,82,0.08)',
             }}
           >
-            {/* Cinematic letterbox bars */}
-            <div style={{
-              position: 'absolute', top: 0, left: 0, right: 0,
-              height: '8%', background: 'rgba(0,0,0,0.55)', zIndex: 2,
-            }} />
-            <div style={{
-              position: 'absolute', bottom: 0, left: 0, right: 0,
-              height: '8%', background: 'rgba(0,0,0,0.55)', zIndex: 2,
-            }} />
-
-            {/* Dark gradient background */}
-            <div style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'linear-gradient(135deg, #1a1208 0%, #0d0d0d 60%, #0a0805 100%)',
-            }} />
-
-            {/* Subtle gold vignette */}
-            <div style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.5) 100%)',
-            }} />
-
-            {/* Center content */}
-            <div style={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '20px',
-              zIndex: 3,
-              padding: '24px',
-            }}>
-              {/* Subtitle */}
-              <span style={{
-                fontFamily: 'var(--font-sans)',
-                fontSize: '10px',
-                letterSpacing: '0.28em',
-                textTransform: 'uppercase',
-                color: 'rgba(200,155,82,0.6)',
-              }}>
-                Purpose · People · Legacy
-              </span>
-
-              {/* Play button */}
-              <motion.div
-                whileHover={{ scale: 1.12 }}
-                whileTap={{ scale: 0.95 }}
+            {/* Cloudinary video — contained in the fixed frame, fullscreen & PiP disabled */}
+            {hasVideo && (
+              <video
+                ref={videoRef}
+                src={reelVideo.src}
+                poster={reelVideo.poster || undefined}
+                preload="metadata"
+                playsInline
+                controls={playing}
+                disablePictureInPicture
+                controlsList="nofullscreen nodownload noremoteplayback"
+                onPlay={() => setPlaying(true)}
+                onPause={() => setPlaying(false)}
+                onEnded={() => setPlaying(false)}
                 style={{
-                  width: '72px',
-                  height: '72px',
-                  borderRadius: '50%',
-                  background: 'rgba(200,155,82,0.92)',
-                  border: '2px solid rgba(255,255,255,0.15)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 0 32px rgba(200,155,82,0.35)',
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  zIndex: 1,
+                  background: '#000',
                 }}
-              >
-                {/* Play triangle */}
+              />
+            )}
+
+            {/* Overlay — hidden while the video plays */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 2,
+              opacity: showOverlay ? 1 : 0,
+              transition: 'opacity 0.4s ease',
+              pointerEvents: 'none',
+            }}>
+              {/* Dark gradient background (only before first play / when no poster) */}
+              {!(started || reelVideo.poster) && (
                 <div style={{
-                  width: 0, height: 0,
-                  borderTop: '13px solid transparent',
-                  borderBottom: '13px solid transparent',
-                  borderLeft: '22px solid #080808',
-                  marginLeft: '4px',
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(135deg, #1a1208 0%, #0d0d0d 60%, #0a0805 100%)',
                 }} />
-              </motion.div>
+              )}
 
-              {/* Title */}
-              <span style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 'clamp(18px, 2.5vw, 26px)',
-                fontWeight: 600,
-                color: 'var(--cream)',
-                letterSpacing: '-0.01em',
-                textAlign: 'center',
-              }}>
-                Sameer Somal
-              </span>
-            </div>
+              {/* Cinematic letterbox bars */}
+              <div style={{
+                position: 'absolute', top: 0, left: 0, right: 0,
+                height: '8%', background: 'rgba(0,0,0,0.55)', zIndex: 2,
+              }} />
+              <div style={{
+                position: 'absolute', bottom: 0, left: 0, right: 0,
+                height: '8%', background: 'rgba(0,0,0,0.55)', zIndex: 2,
+              }} />
 
-            {/* Bottom bar — title + duration */}
-            <div style={{
-              position: 'absolute',
-              bottom: 0, left: 0, right: 0,
-              padding: '16px 20px 10px',
-              background: 'linear-gradient(to top, rgba(8,8,8,0.85) 0%, transparent 100%)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-end',
-              zIndex: 4,
-            }}>
-              <span style={{
-                fontFamily: 'var(--font-serif)',
-                fontSize: '13px',
-                fontStyle: 'italic',
-                color: 'rgba(243,235,221,0.7)',
-                letterSpacing: '0.04em',
-              }}>
-                Moments That Matter
-              </span>
-              <span style={{
-                fontFamily: 'var(--font-sans)',
-                fontSize: '11px',
-                color: 'var(--muted)',
-                background: 'rgba(0,0,0,0.5)',
-                padding: '3px 8px',
-                borderRadius: '4px',
-              }}>
-                00:56
-              </span>
-            </div>
+              {/* Subtle gold vignette */}
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.5) 100%)',
+              }} />
 
-            {/* [Placeholder label] */}
-            <div style={{
-              position: 'absolute',
-              top: '12px',
-              left: '16px',
-              zIndex: 5,
-              background: 'rgba(0,0,0,0.6)',
-              padding: '3px 10px',
-              borderRadius: '4px',
-              border: '1px solid rgba(200,155,82,0.15)',
-            }}>
-              <span style={{
-                fontFamily: 'var(--font-sans)',
-                fontSize: '9px',
-                letterSpacing: '0.14em',
-                textTransform: 'uppercase',
-                color: 'rgba(200,155,82,0.4)',
+              {/* Center content */}
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '20px',
+                zIndex: 3,
+                padding: '24px',
               }}>
-                [Insert reel video asset]
-              </span>
+                {/* Subtitle */}
+                <span style={{
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: '10px',
+                  letterSpacing: '0.28em',
+                  textTransform: 'uppercase',
+                  color: 'rgba(200,155,82,0.6)',
+                }}>
+                  Purpose · People · Legacy
+                </span>
+
+                {/* Play button */}
+                <motion.div
+                  whileHover={{ scale: 1.12 }}
+                  whileTap={{ scale: 0.95 }}
+                  style={{
+                    width: '72px',
+                    height: '72px',
+                    borderRadius: '50%',
+                    background: 'rgba(200,155,82,0.92)',
+                    border: '2px solid rgba(255,255,255,0.15)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 0 32px rgba(200,155,82,0.35)',
+                    pointerEvents: 'auto',
+                  }}
+                >
+                  {/* Play triangle */}
+                  <div style={{
+                    width: 0, height: 0,
+                    borderTop: '13px solid transparent',
+                    borderBottom: '13px solid transparent',
+                    borderLeft: '22px solid #080808',
+                    marginLeft: '4px',
+                  }} />
+                </motion.div>
+
+                {/* Title */}
+                <span style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 'clamp(18px, 2.5vw, 26px)',
+                  fontWeight: 600,
+                  color: 'var(--cream)',
+                  letterSpacing: '-0.01em',
+                  textAlign: 'center',
+                }}>
+                  Sameer Somal
+                </span>
+              </div>
+
+              {/* Bottom bar — title + duration */}
+              <div style={{
+                position: 'absolute',
+                bottom: 0, left: 0, right: 0,
+                padding: '16px 20px 10px',
+                background: 'linear-gradient(to top, rgba(8,8,8,0.85) 0%, transparent 100%)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-end',
+                zIndex: 4,
+              }}>
+                <span style={{
+                  fontFamily: 'var(--font-serif)',
+                  fontSize: '13px',
+                  fontStyle: 'italic',
+                  color: 'rgba(243,235,221,0.7)',
+                  letterSpacing: '0.04em',
+                }}>
+                  Moments That Matter
+                </span>
+                <span style={{
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: '11px',
+                  color: 'var(--muted)',
+                  background: 'rgba(0,0,0,0.5)',
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                }}>
+                  {reelVideo.duration}
+                </span>
+              </div>
+
+              {/* [Placeholder label] — only shown until a Cloudinary URL is added */}
+              {!hasVideo && (
+                <div style={{
+                  position: 'absolute',
+                  top: '12px',
+                  left: '16px',
+                  zIndex: 5,
+                  background: 'rgba(0,0,0,0.6)',
+                  padding: '3px 10px',
+                  borderRadius: '4px',
+                  border: '1px solid rgba(200,155,82,0.15)',
+                }}>
+                  <span style={{
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: '9px',
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
+                    color: 'rgba(200,155,82,0.4)',
+                  }}>
+                    [Insert reel video asset]
+                  </span>
+                </div>
+              )}
             </div>
           </motion.div>
         </FadeUp>

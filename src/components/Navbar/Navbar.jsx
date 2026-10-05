@@ -6,7 +6,6 @@ const navLinks = [
   { label: 'Home', href: '#hero' },
   { label: 'Journey', href: '#journey' },
   { label: 'Companies', href: '#companies' },
-  { label: 'Impact', href: '#impact' },
   { label: 'Media', href: '#documentary' },
   { label: 'People', href: '#legacy' },
   { label: 'Contact', href: '#contact' },

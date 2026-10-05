@@ -1,20 +1,59 @@
+/**
+ * Hero — cinematic multi-layer parallax
+ *
+ * Parallax contract (all GPU transform only):
+ *   Background image:  0.15× scroll speed  (deepest layer)
+ *   Gradient overlays: static              (on top of image)
+ *   Text content:      0.10× scroll speed  (floats above bg)
+ *   Quote card:        0.07× scroll speed  (slightly behind text)
+ *
+ * On mobile: parallax is disabled to avoid scroll lag.
+ * All scroll calculations run in requestAnimationFrame only.
+ * Zero React state updates on scroll.
+ */
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { CTAButton } from '../ui/CTAButton';
 import { sameerData } from '../../data/sameer';
 
 const featuredIn = ['Forbes', 'Bloomberg', 'IBM', 'ABA', 'CFA Institute'];
 
+/**
+ * Detects mobile/reduced-motion to skip parallax.
+ * Called once at component mount — not on every scroll.
+ */
+function shouldEnableParallax() {
+  if (typeof window === 'undefined') return false;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+  if (window.innerWidth < 768) return false;
+  return true;
+}
+
 export function Hero() {
-  const ref = useRef(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] });
-  const imageScale = useTransform(scrollYProgress, [0, 1], [1.04, 1.0]);
-  const textY = useTransform(scrollYProgress, [0, 1], ['0%', '12%']);
+  const sectionRef = useRef(null);
+  // Evaluated once on mount — never on scroll
+  const [parallax] = useState(shouldEnableParallax);
+  const k = parallax ? 1 : 0; // collapses all ranges to 0 on mobile / reduced-motion
+
+  // Framer Motion drives these as MotionValues → no React re-renders on scroll
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ['start start', 'end start'],
+  });
+
+  // Text layer: 0.10×
+  const textY = useTransform(scrollYProgress, [0, 1], ['0%', `${10 * k}%`]);
+  // Background image: 0.15× (deepest layer)
+  const bgY = useTransform(scrollYProgress, [0, 1], ['0%', `${15 * k}%`]);
+  // Subtle Ken Burns settle on the background
+  const imageScale = useTransform(scrollYProgress, [0, 1], [parallax ? 1.04 : 1, 1.0]);
+  // Quote card: 0.07×
+  const quoteY = useTransform(scrollYProgress, [0, 1], ['0%', `${7 * k}%`]);
 
   return (
     <section
       id="hero"
-      ref={ref}
+      ref={sectionRef}
       style={{
         position: 'relative',
         minHeight: '100vh',
@@ -24,13 +63,15 @@ export function Hero() {
         flexDirection: 'column',
       }}
     >
-      {/* Hero background image */}
+      {/* ── Layer 1: Background image (parallax 0.15×) ── */}
       <motion.div
         style={{
           position: 'absolute',
-          inset: 0,
+          inset: '-10% 0',   /* extra height top/bottom so parallax doesn't expose edges */
           scale: imageScale,
+          y: bgY,
           transformOrigin: 'center center',
+          willChange: 'transform',
         }}
       >
         <img
@@ -42,15 +83,16 @@ export function Hero() {
             objectFit: 'cover',
             objectPosition: 'center top',
             filter: 'brightness(0.55) contrast(1.08)',
+            display: 'block',
           }}
         />
-        {/* Cinematic dark gradient — left side for text */}
+
+        {/* ── Layer 2: Cinematic gradients (static — on GPU compositor) ── */}
         <div style={{
           position: 'absolute',
           inset: 0,
           background: 'linear-gradient(105deg, rgba(8,8,8,0.90) 0%, rgba(8,8,8,0.70) 40%, rgba(8,8,8,0.20) 70%, rgba(8,8,8,0.05) 100%)',
         }} />
-        {/* Bottom fade */}
         <div style={{
           position: 'absolute',
           bottom: 0, left: 0, right: 0,
@@ -59,7 +101,7 @@ export function Hero() {
         }} />
       </motion.div>
 
-      {/* Hero content */}
+      {/* ── Layer 3: Text content (parallax 0.10×) ── */}
       <motion.div
         style={{
           position: 'relative',
@@ -72,13 +114,11 @@ export function Hero() {
           paddingTop: '120px',
           paddingBottom: '80px',
           y: textY,
+          willChange: 'transform',
         }}
       >
         {/* Roles label */}
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.2 }}
+        <p
           style={{
             fontFamily: 'var(--font-sans)',
             fontSize: '10px',
@@ -90,14 +130,11 @@ export function Hero() {
           }}
         >
           Entrepreneur · Mentor · Historian · Community Builder
-        </motion.p>
+        </p>
 
-        {/* Main Name */}
+        {/* Main Name — immediate render, no 2-second staring animation */}
         <div style={{ marginBottom: '16px' }}>
-          <motion.h1
-            initial={{ opacity: 0, y: 36 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.35, ease: [0.4, 0, 0.2, 1] }}
+          <h1
             style={{
               fontFamily: 'var(--font-display)',
               fontSize: 'clamp(64px, 12vw, 140px)',
@@ -109,11 +146,8 @@ export function Hero() {
             }}
           >
             SAMEER
-          </motion.h1>
-          <motion.span
-            initial={{ opacity: 0, y: 36 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.48, ease: [0.4, 0, 0.2, 1] }}
+          </h1>
+          <span
             style={{
               display: 'block',
               fontFamily: 'var(--font-display)',
@@ -125,14 +159,11 @@ export function Hero() {
             }}
           >
             SOMAL
-          </motion.span>
+          </span>
         </div>
 
         {/* Tagline */}
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.62 }}
+        <p
           style={{
             fontFamily: 'var(--font-sans)',
             fontSize: '10px',
@@ -144,13 +175,10 @@ export function Hero() {
           }}
         >
           People · Purpose · Legacy
-        </motion.p>
+        </p>
 
         {/* Description */}
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.76 }}
+        <p
           style={{
             fontFamily: 'var(--font-sans)',
             fontSize: '15px',
@@ -161,13 +189,10 @@ export function Hero() {
           }}
         >
           {sameerData.description}
-        </motion.p>
+        </p>
 
         {/* CTAs */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.90 }}
+        <div
           style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}
         >
           <CTAButton href="#documentary" variant="gold">
@@ -176,14 +201,12 @@ export function Hero() {
           <CTAButton href="#journey" variant="outline">
             Explore Journey ↓
           </CTAButton>
-        </motion.div>
+        </div>
       </motion.div>
 
-      {/* Editorial quote — top right overlay */}
-      <motion.div
-        initial={{ opacity: 0, x: 30 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.9, delay: 1.1 }}
+      {/* ── Layer 4: Editorial quote (parallax 0.07×) — wrapper holds the centring transform ── */}
+      <div
+        className="hero-quote"
         style={{
           position: 'absolute',
           top: '50%',
@@ -193,7 +216,9 @@ export function Hero() {
           textAlign: 'right',
           maxWidth: '220px',
         }}
-        className="hero-quote"
+      >
+      <motion.div
+        style={{ y: quoteY }}
       >
         <span style={{
           display: 'block',
@@ -226,12 +251,10 @@ export function Hero() {
           — Sameer Somal
         </span>
       </motion.div>
+      </div>
 
-      {/* Featured In strip */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, delay: 1.2 }}
+      {/* ── Featured In strip ── */}
+      <div
         style={{
           position: 'relative',
           zIndex: 10,
@@ -268,7 +291,7 @@ export function Hero() {
             {name}
           </span>
         ))}
-      </motion.div>
+      </div>
 
       <style>{`
         @media (max-width: 768px) {
