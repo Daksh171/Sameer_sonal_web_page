@@ -79,27 +79,6 @@ function CompanyCard({ company, index }) {
               background: 'rgba(8,8,8,0.35)',
             }}
           />
-
-          {/* Category tag */}
-          <div style={{
-            position: 'absolute', top: '16px', left: '16px',
-            background: 'rgba(8,8,8,0.75)',
-            backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(200,155,82,0.2)',
-            borderRadius: '50px',
-            padding: '5px 12px',
-          }}>
-            <span style={{
-              fontFamily: 'var(--font-sans)',
-              fontSize: '9px',
-              fontWeight: 500,
-              letterSpacing: '0.15em',
-              textTransform: 'uppercase',
-              color: 'var(--gold)',
-            }}>
-              {company.category}
-            </span>
-          </div>
         </div>
 
         {/* Card content */}
